@@ -1,5 +1,8 @@
 const inquirer = require('inquirer');
 const connection = require('./config/connection');
+const EmployeeTracker = require('./lib/lib')
+
+const emp = new EmployeeTracker(connection);
 
 function menu() {
     inquirer
@@ -37,11 +40,19 @@ function menu() {
                 case "Add a department":
                     addDepartment();
                     break;
+                
+                case "Add a role": 
+                    addRole();
+                    break;
+
+                case "Add an employee":
+                    addEmployee();
+                    break;
 
                 case "Quit": 
                     connection.end();
                     process.exit();
-                
+
                 default: 
                     menu();
             }
@@ -53,43 +64,39 @@ function menu() {
 }
 
 function viewAllDepartments() {
-    let sql = 'SELECT id, name FROM department';
-    connection.promise().query(sql)
-        .then( ([row, fields]) => {
-            console.table(row)
+    emp.getDepartments()
+        .then((rows) => {
+            console.table(rows);
             menu();
         })
-        .catch(console.error);
+        .catch((err) => {
+            console.error(err);
+            menu();
+        });
 };
 
 function viewAllRoles() {
-    let sql = `SELECT role.id, role.title, role.salary, department.name as department_name
-               FROM role
-               INNER JOIN department ON role.department_id = department.id `;
-    connection.promise().query(sql)
-        .then(([row, fields]) => {
-            console.table(row)
+    emp.getRoles()
+        .then((rows) => {
+            console.table(rows)
             menu();
         })
-        .catch(console.error);
+        .catch((err) => {
+            console.error(err);
+            menu();
+        });
 };
 
 function viewAllEmployees() {
-    let sql = `SELECT employee.id,
-               employee.first_name,
-               employee.last_name,
-               role.title,
-               department.name AS 'department',
-               role.salary
-               FROM employee, role, department
-               WHERE department.id = role.department_id
-               AND role.id = employee.role_id`;
-    connection.promise().query(sql)
-        .then(([row, fields]) => {
-            console.table(row)
+    emp.getEmployees()
+        .then((rows) => {
+            console.table(rows)
             menu();
         })
-        .catch(console.error);
+        .catch((err) => {
+            console.error(err);
+            menu();
+        });
 };
 
 function addDepartment() {
@@ -103,18 +110,146 @@ function addDepartment() {
         ])
         .then((answer) => {
             if (!answer.departmentName) {
-                console.error("Department name is not valid.")
+                console.error("Department name is not valid.");
+                menu();
+
             } else {
-                let sql = `INSERT INTO department (name) VALUE (?)`
-                connection.promise().query(sql, answer.departmentName)
-                    .then(([row, fields]) => {
-                        console.log(`${answer.departmentName} added successfully!` );
-                        viewAllDepartments();
-                    }) 
-                    .catch(console.error);
+                emp.addDepartment(answer.departmentName)
+                .then(() => {
+                    console.log(`${answer.departmentName} added successfully!` );
+                    viewAllDepartments();
+                }) 
+                .catch((error) => {
+                    console.error(error);
+                    menu();
+                });
             }
-            menu();
         })
 };
 
+function addRole() {
+
+    emp.getDepartments()
+        .then((departments) => {
+            inquirer.prompt([
+                {
+                    name: 'title',
+                    type: 'input',
+                    message: 'Enter the role name to add' 
+                },
+                {
+                    name: 'salary',
+                    type: 'input',
+                    message: 'Enter the role salary' 
+                },
+                {
+                    name: 'department',
+                    type: 'list',
+                    choices: departments
+                }
+            ])
+            .then((answers) => {
+                if (!answers.title || !answers.salary) {
+                    console.error("Valid values were not provided to add new role.");
+                } else {
+                    const selectedDepartment = departments.find(department => department.name === answers.department )
+                    emp.addRole(answers.title, answers.salary, selectedDepartment.id)
+                        .then(() => {
+                            console.log(`Department ${answers.title} added.`);
+                            emp.getRoles().then((rows) => {
+                                console.table(rows);
+                            });
+                        })
+                        .catch((error) => {
+                            console.error(error);
+                        });
+                }
+                menu();
+            })
+            .catch((error) => {
+                console.error(error);
+                menu();
+            })   
+        })
+        .catch((error) => {
+            console.error(`Failed to get departments: ${error}`);
+            console.error(`Unable to add a new role.`);
+            
+        });    
+}
+
+function addEmployee() {
+
+    inquirer
+        .prompt([    
+            {
+                name: 'firstName',
+                type: 'input',
+                message: 'Enter employee first name' 
+            },
+            {
+                name: 'lastName',
+                type: 'input',
+                message: 'Enter employee last name' 
+            }
+        ])
+        .then((answers) => {
+            if (!answers.firstName || !answers.lastName) {
+                console.error(`First name and last name cant be empty.`)
+                menu();
+            } else {
+                emp.getRoles()
+                .then((roles) => {
+                    const roleChoices = roles.map(({ id, title}) => ({name: title, value: id}))
+                    inquirer.prompt(
+                        {
+                            name: 'rChoice',
+                            message: "Select the employees role",
+                            type: 'list',
+                            choices: roleChoices
+                        }
+                    )
+                    .then((selectedRole) => {
+                        emp.getEmployees()
+                            .then((employeeList) => {
+
+                                const empList = employeeList.map(({id, first_name, last_name}) => ({
+                                    name: `${first_name} ${last_name}`,
+                                    value: id
+                                }));
+
+                                inquirer.prompt([
+                                    {
+                                        name: 'manager',
+                                        type: 'list',
+                                        message: "Select the employees manager",
+                                        choices: empList
+                                    }
+                                ])
+                                .then((selectedManager) => {
+                                    emp.addEmployee(
+                                        answers.firstName, answers.lastName, selectedRole.rChoice, selectedManager.manager
+                                    ).then(() => {
+                                        console.log(`Employee ${answers.firstName} added to database.`)
+                                        menu();
+                                    })
+                                    .catch((err) => {
+                                        console.error(err);
+                                    })
+                                })
+                                .catch(error => logErrorAndGoBackToMenu)
+                            })
+                            .catch(error => logErrorAndGoBackToMenur)
+                    })
+                    .catch(error => logErrorAndGoBackToMenu)
+                })
+                .catch(error => logErrorAndGoBackToMenu)
+            }
+        });
+}
+
+function logErrorAndGoBackToMenu(error) {
+    console.error(error);
+    menu();
+}
 menu();
