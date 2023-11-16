@@ -155,20 +155,21 @@ function addRole() {
             .then((answers) => {
                 if (!answers.title || !answers.salary) {
                     console.error("Valid values were not provided to add new role.");
+                    menu();
                 } else {
                     const selectedDepartment = departments.find(department => department.name === answers.department )
                     emp.addRole(answers.title, answers.salary, selectedDepartment.id)
                         .then(() => {
                             console.log(`Department ${answers.title} added.`);
                             emp.getRoles().then((rows) => {
-                                console.table(rows);
+                                viewAllRoles();
                             });
                         })
                         .catch((error) => {
                             console.error(error);
+                            menu();
                         });
                 }
-                menu();
             })
             .catch((error) => {
                 console.error(error);
