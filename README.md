@@ -28,9 +28,9 @@ node index.js
 ```
 
 ## Usage
+[Seeding the database with test data video](https://drive.google.com/file/d/15uWpJgLmKirfj0YeXkDd93T9nET3xk77/view)
 
-Video tutorial for using the CLI interface can be found here: 
-
+[Using the CLI Video](https://drive.google.com/file/d/1LjryGJpRLMbcZDdcyzsSxDysIGOj7Yx3/view)
 
 ## License
 
