@@ -49,6 +49,10 @@ function menu() {
                     addEmployee();
                     break;
 
+                case "Update an employee role":
+                    updateEmployeeRole();
+                    break;
+
                 case "Quit": 
                     connection.end();
                     process.exit();
@@ -231,25 +235,66 @@ function addEmployee() {
                                         answers.firstName, answers.lastName, selectedRole.rChoice, selectedManager.manager
                                     ).then(() => {
                                         console.log(`Employee ${answers.firstName} added to database.`)
-                                        menu();
+                                        viewAllEmployees();
                                     })
                                     .catch((err) => {
                                         console.error(err);
                                     })
                                 })
-                                .catch(error => logErrorAndGoBackToMenu)
+                                .catch((err) => {
+                                    console.error(err);
+                                })
                             })
-                            .catch(error => logErrorAndGoBackToMenur)
+                            .catch((err) => {
+                                console.error(err);
+                            });
                     })
-                    .catch(error => logErrorAndGoBackToMenu)
+                    .catch((err) => {
+                        console.error(err);
+                    });
                 })
-                .catch(error => logErrorAndGoBackToMenu)
+                .catch((err) => {
+                    console.error(err);
+                });
             }
         });
 }
 
-function logErrorAndGoBackToMenu(error) {
-    console.error(error);
-    menu();
+function updateEmployeeRole() {
+    emp.getEmployees().then((employees) => {
+        const employeeList = employees.map(({id, first_name, last_name}) => ({name: first_name + " " + last_name , value: id }))
+        
+        emp.getRoles().then((roles) => {
+            const roleList = roles.map(({ id, title}) => ({name: title, value: id}))
+
+            inquirer.prompt([
+                {
+                    type: "list",
+                    name: "employee",
+                    message: "Select employee to update role",
+                    choices: employeeList
+                },
+                {
+                    type: "list",
+                    name: "role",
+                    message: "Select new role",
+                    choices: roleList
+                }
+            ])
+            .then((answers) => {
+                emp.updateEmployeeRole(answers.employee, answers.role).then((resp) => {
+                    console.log(resp);
+                    viewAllEmployees();
+                })
+                .catch((err) => {
+                    console.error(err);
+                })
+            })
+        })
+        .catch((err) => {
+            console.error(err);
+        });
+    });
 }
+
 menu();
